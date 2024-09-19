@@ -1,3 +1,9 @@
+# GNSS-SDR is a Global Navigation Satellite System software-defined receiver.
+# This file is part of GNSS-SDR.
+#
+# Copyright (C) 2012-2020  (see AUTHORS file for a list of contributors)
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
 /*! \page kernels Kernels
 
 \li \subpage volk_gnsssdr_32fc_convert_16ic
@@ -17,7 +23,6 @@
 \li \subpage volk_gnsssdr_8ic_magnitude_squared_8i
 \li \subpage volk_gnsssdr_8ic_x2_dot_prod_8ic
 \li \subpage volk_gnsssdr_8ic_x2_multiply_8ic
-\li \subpage volk_gnsssdr_8ic_s8ic_multiply_8ic
 \li \subpage volk_gnsssdr_8i_accumulator_s8i
 \li \subpage volk_gnsssdr_8i_index_max_16u
 \li \subpage volk_gnsssdr_8i_max_s8i

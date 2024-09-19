@@ -4,100 +4,128 @@
  * \author Carles Fernandez-Prades, 2015. cfernandez(at)cttc.es
  *
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  *
- * Copyright (C) 2010-2015  (see AUTHORS file for a list of contributors)
- *
- * GNSS-SDR is a software defined Global Navigation
- *          Satellite Systems receiver
- *
+ * GNSS-SDR is a Global Navigation Satellite System software-defined receiver.
  * This file is part of GNSS-SDR.
  *
- * GNSS-SDR is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * Copyright (C) 2010-2020  (see AUTHORS file for a list of contributors)
+ * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * GNSS-SDR is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with GNSS-SDR. If not, see <http://www.gnu.org/licenses/>.
- *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  */
 
 
 #include "geojson_printer.h"
-#include <ctime>
-#include <iomanip>
-#include <sstream>
+#include "gnss_sdr_filesystem.h"
+#include "pvt_solution.h"
+#include <boost/date_time/posix_time/posix_time.hpp>
 #include <glog/logging.h>
+#include <ctime>      // for tm
+#include <exception>  // for exception
+#include <iomanip>    // for operator<<
+#include <iostream>   // for cout, cerr
+#include <sstream>    // for stringstream
 
-GeoJSON_Printer::GeoJSON_Printer()
+
+GeoJSON_Printer::GeoJSON_Printer(const std::string& base_path) : geojson_base_path(base_path),
+                                                                 first_pos(true)
 {
-    first_pos = true;
+    fs::path full_path(fs::current_path());
+    const fs::path p(geojson_base_path);
+    if (!fs::exists(p))
+        {
+            std::string new_folder;
+            for (const auto& folder : fs::path(geojson_base_path))
+                {
+                    new_folder += folder.string();
+                    errorlib::error_code ec;
+                    if (!fs::exists(new_folder))
+                        {
+                            if (!fs::create_directory(new_folder, ec))
+                                {
+                                    std::cout << "Could not create the " << new_folder << " folder.\n";
+                                    geojson_base_path = full_path.string();
+                                }
+                        }
+                    new_folder += fs::path::preferred_separator;
+                }
+        }
+    else
+        {
+            geojson_base_path = p.string();
+        }
+    if (geojson_base_path != ".")
+        {
+            std::cout << "GeoJSON files will be stored at " << geojson_base_path << '\n';
+        }
+
+    geojson_base_path = geojson_base_path + fs::path::preferred_separator;
 }
 
 
-
-GeoJSON_Printer::~GeoJSON_Printer ()
+GeoJSON_Printer::~GeoJSON_Printer()
 {
-    GeoJSON_Printer::close_file();
+    DLOG(INFO) << "GeoJSON printer destructor called.";
+    try
+        {
+            GeoJSON_Printer::close_file();
+        }
+    catch (const std::exception& e)
+        {
+            std::cerr << e.what() << '\n';
+        }
 }
 
 
-bool GeoJSON_Printer::set_headers(std::string filename, bool time_tag_name)
+bool GeoJSON_Printer::set_headers(const std::string& filename, bool time_tag_name)
 {
-    time_t rawtime;
-    struct tm * timeinfo;
-    time ( &rawtime );
-    timeinfo = localtime ( &rawtime );
+    const boost::posix_time::ptime pt = boost::posix_time::second_clock::local_time();
+    const tm timeinfo = boost::posix_time::to_tm(pt);
 
     if (time_tag_name)
         {
             std::stringstream strm0;
-            const int year = timeinfo->tm_year - 100;
+            const int year = timeinfo.tm_year - 100;
             strm0 << year;
-            const int month = timeinfo->tm_mon + 1;
-            if(month < 10)
+            const int month = timeinfo.tm_mon + 1;
+            if (month < 10)
                 {
                     strm0 << "0";
                 }
             strm0 << month;
-            const int day = timeinfo->tm_mday;
-            if(day < 10)
+            const int day = timeinfo.tm_mday;
+            if (day < 10)
                 {
                     strm0 << "0";
                 }
             strm0 << day << "_";
-            const int hour = timeinfo->tm_hour;
-            if(hour < 10)
+            const int hour = timeinfo.tm_hour;
+            if (hour < 10)
                 {
                     strm0 << "0";
                 }
             strm0 << hour;
-            const int min = timeinfo->tm_min;
-            if(min < 10)
+            const int min = timeinfo.tm_min;
+            if (min < 10)
                 {
                     strm0 << "0";
                 }
             strm0 << min;
-            const int sec = timeinfo->tm_sec;
-            if(sec < 10)
+            const int sec = timeinfo.tm_sec;
+            if (sec < 10)
                 {
                     strm0 << "0";
                 }
             strm0 << sec;
 
-            filename_ = filename + "_" +  strm0.str() + ".geojson";
+            filename_ = filename + "_" + strm0.str() + ".geojson";
         }
     else
         {
             filename_ = filename + ".geojson";
         }
+    filename_ = geojson_base_path + filename_;
 
     geojson_file.open(filename_.c_str());
 
@@ -107,51 +135,32 @@ bool GeoJSON_Printer::set_headers(std::string filename, bool time_tag_name)
             DLOG(INFO) << "GeoJSON printer writing on " << filename.c_str();
 
             // Set iostream numeric format and precision
-            geojson_file.setf(geojson_file.fixed, geojson_file.floatfield);
+            geojson_file.setf(geojson_file.std::ofstream::fixed, geojson_file.std::ofstream::floatfield);
             geojson_file << std::setprecision(14);
 
             // Writing the header
-            geojson_file << "{" << std::endl;
-            geojson_file << "  \"type\":  \"Feature\"," << std::endl;
-            geojson_file << "  \"properties\": {" << std::endl;
-            geojson_file << "       \"name\": \"Locations generated by GNSS-SDR\" " << std::endl;
-            geojson_file << "   }," << std::endl;
-
-
-            geojson_file << "  \"geometry\": {" << std::endl;
-            geojson_file << "      \"type\": \"MultiPoint\"," << std::endl;
-            geojson_file << "      \"coordinates\": [" << std::endl;
+            geojson_file << "{\n";
+            geojson_file << R"(  "type":  "Feature",)" << '\n';
+            geojson_file << "  \"properties\": {\n";
+            geojson_file << R"(       "name": "Locations generated by GNSS-SDR" )" << '\n';
+            geojson_file << "   },\n";
+            geojson_file << "  \"geometry\": {\n";
+            geojson_file << R"(      "type": "MultiPoint",)" << '\n';
+            geojson_file << "      \"coordinates\": [\n";
 
             return true;
         }
-    else
-        {
-            return false;
-        }
+
+    std::cout << "File " << filename_ << " cannot be saved. Wrong permissions?\n";
+    return false;
 }
 
 
-
-bool GeoJSON_Printer::print_position(const std::shared_ptr<Pvt_Solution>& position, bool print_average_values)
+bool GeoJSON_Printer::print_position(const Pvt_Solution* const position)
 {
-    double latitude;
-    double longitude;
-    double height;
-
-    std::shared_ptr<Pvt_Solution> position_ = position;
-
-    if (print_average_values == false)
-        {
-            latitude = position_->d_latitude_d;
-            longitude = position_->d_longitude_d;
-            height = position_->d_height_m;
-        }
-    else
-        {
-            latitude = position_->d_avg_latitude_d;
-            longitude = position_->d_avg_longitude_d;
-            height = position_->d_avg_height_m;
-        }
+    const double latitude = position->get_latitude();
+    const double longitude = position->get_longitude();
+    const double height = position->get_height();
 
     if (geojson_file.is_open())
         {
@@ -162,41 +171,35 @@ bool GeoJSON_Printer::print_position(const std::shared_ptr<Pvt_Solution>& positi
                 }
             else
                 {
-                    geojson_file << "," << std::endl;
+                    geojson_file << ",\n";
                     geojson_file << "       [" << longitude << ", " << latitude << ", " << height << "]";
                 }
             return true;
         }
-    else
-        {
-            return false;
-        }
+    return false;
 }
-
 
 
 bool GeoJSON_Printer::close_file()
 {
     if (geojson_file.is_open())
         {
-            geojson_file << std::endl;
-            geojson_file << "       ]" << std::endl;
-            geojson_file << "   }" << std::endl;
-            geojson_file << "}" << std::endl;
+            geojson_file << '\n';
+            geojson_file << "       ]\n";
+            geojson_file << "   }\n";
+            geojson_file << "}\n";
             geojson_file.close();
 
             // if nothing is written, erase the file
             if (first_pos == true)
                 {
-                    if(remove(filename_.c_str()) != 0) LOG(INFO) << "Error deleting temporary file";
+                    errorlib::error_code ec;
+                    if (!fs::remove(fs::path(filename_), ec))
+                        {
+                            LOG(INFO) << "Error deleting temporary file";
+                        }
                 }
-
             return true;
         }
-    else
-        {
-            return false;
-        }
+    return false;
 }
-
-

@@ -1,9 +1,9 @@
 function [satPositions, satClkCorr] = satpos(transmitTime, prnList, ...
-                                             eph, settings) 
-%SATPOS Computation of satellite coordinates X,Y,Z at TRANSMITTIME for
-%given ephemeris EPH. Coordinates are computed for each satellite in the
-%list PRNLIST.
-%[satPositions, satClkCorr] = satpos(transmitTime, prnList, eph, settings);
+    eph, settings)
+% SATPOS Computation of satellite coordinates X,Y,Z at TRANSMITTIME for
+% given ephemeris EPH. Coordinates are computed for each satellite in the
+% list PRNLIST.
+%[ satPositions, satClkCorr] = satpos(transmitTime, prnList, eph, settings);
 %
 %   Inputs:
 %       transmitTime  - transmission time
@@ -18,25 +18,27 @@ function [satPositions, satClkCorr] = satpos(transmitTime, prnList, ...
 %--------------------------------------------------------------------------
 %                           SoftGNSS v3.0
 %--------------------------------------------------------------------------
-%Based on Kai Borre 04-09-96
-%Copyright (c) by Kai Borre
-%Updated by Darius Plausinaitis, Peter Rinder and Nicolaj Bertelsen
+% Based on Kai Borre 04-09-96
+% Updated by Darius Plausinaitis, Peter Rinder and Nicolaj Bertelsen
 %
-% CVS record:
-% $Id: satpos.m,v 1.1.2.17 2007/01/30 09:45:12 dpl Exp $
+% GNSS-SDR is a Global Navigation Satellite System software-defined receiver.
+% This file is part of GNSS-SDR.
+%
+% SPDX-FileCopyrightText: Kai Borre
+% SPDX-License-Identifier: GPL-3.0-or-later
 
 %% Initialize constants ===================================================
 numOfSatellites = size(prnList, 2);
 
 % GPS constatns
 
-gpsPi          = 3.1415926535898;  % Pi used in the GPS coordinate 
-                                   % system
+gpsPi          = 3.1415926535898;  % Pi used in the GPS coordinate
+% system
 
 %--- Constants for satellite position calculation -------------------------
 Omegae_dot     = 7.2921151467e-5;  % Earth rotation rate, [rad/s]
 GM             = 3.986005e14;      % Universal gravitational constant times
-                                   % the mass of the Earth, [m^3/s^2]
+% the mass of the Earth, [m^3/s^2]
 F              = -4.442807633e-10; % Constant, [sec/(meter)^(1/2)]
 
 %% Initialize results =====================================================
@@ -46,22 +48,22 @@ satPositions = zeros(3, numOfSatellites);
 %% Process each satellite =================================================
 
 for satNr = 1 : numOfSatellites
-    
+
     prn = prnList(satNr);
-    
-%% Find initial satellite clock correction --------------------------------
+
+    %% Find initial satellite clock correction --------------------------------
 
     %--- Find time difference ---------------------------------------------
     dt = check_t(transmitTime - eph(prn).t_oc);
 
     %--- Calculate clock correction ---------------------------------------
     satClkCorr(satNr) = (eph(prn).a_f2 * dt + eph(prn).a_f1) * dt + ...
-                         eph(prn).a_f0 - ...
-                         eph(prn).T_GD;
+        eph(prn).a_f0 - ...
+        eph(prn).T_GD;
 
     time = transmitTime - satClkCorr(satNr);
 
-%% Find satellite's position ----------------------------------------------
+    %% Find satellite's position ----------------------------------------------
 
     %Restore semi-major axis
     a   = eph(prn).sqrtA * eph(prn).sqrtA;
@@ -89,10 +91,10 @@ for satNr = 1 : numOfSatellites
         dE      = rem(E - E_old, 2*gpsPi);
 
         if abs(dE) < 1.e-12
-            % Necessary precision is reached, exit from the loop 
+            % Necessary precision is reached, exit from the loop
             break;
         end
-    end 
+    end
 
     %Reduce eccentric anomaly to between 0 and 360 deg
     E   = rem(E + 2*gpsPi, 2*gpsPi);
@@ -123,7 +125,7 @@ for satNr = 1 : numOfSatellites
 
     %Compute the angle between the ascending node and the Greenwich meridian
     Omega = eph(prn).omega_0 + (eph(prn).omegaDot - Omegae_dot)*tk - ...
-            Omegae_dot * eph(prn).t_oe;
+        Omegae_dot * eph(prn).t_oe;
     %Reduce to between 0 and 360 deg
     Omega = rem(Omega + 2*gpsPi, 2*gpsPi);
 
@@ -133,9 +135,9 @@ for satNr = 1 : numOfSatellites
     satPositions(3, satNr) = sin(u)*r * sin(i);
 
 
-%% Include relativistic correction in clock correction --------------------
+    %% Include relativistic correction in clock correction --------------------
     satClkCorr(satNr) = (eph(prn).a_f2 * dt + eph(prn).a_f1) * dt + ...
-                         eph(prn).a_f0 - ...
-                         eph(prn).T_GD + dtr;
-                     
+        eph(prn).a_f0 - ...
+        eph(prn).T_GD + dtr;
+
 end % for satNr = 1 : numOfSatellites

@@ -4,99 +4,84 @@
  * to a ObservablesInterface
  * \author Javier Arribas, 2011. jarribas(at)cttc.es
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  *
- * Copyright (C) 2010-2015  (see AUTHORS file for a list of contributors)
- *
- * GNSS-SDR is a software defined Global Navigation
- *          Satellite Systems receiver
- *
+ * GNSS-SDR is a Global Navigation Satellite System software-defined receiver.
  * This file is part of GNSS-SDR.
  *
- * GNSS-SDR is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * Copyright (C) 2010-2020  (see AUTHORS file for a list of contributors)
+ * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * GNSS-SDR is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with GNSS-SDR. If not, see <http://www.gnu.org/licenses/>.
- *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  */
-
 
 #include "hybrid_observables.h"
 #include "configuration_interface.h"
+#include "gnss_sdr_flags.h"
+#include "obs_conf.h"
 #include <glog/logging.h>
-#include "GPS_L1_CA.h"
-#include "Galileo_E1.h"
+#include <ostream>  // for operator<<
 
-using google::LogMessage;
-
-HybridObservables::HybridObservables(ConfigurationInterface* configuration,
-        std::string role,
-        unsigned int in_streams,
-        unsigned int out_streams) :
-                            role_(role),
-                            in_streams_(in_streams),
-                            out_streams_(out_streams)
+HybridObservables::HybridObservables(const ConfigurationInterface* configuration,
+    const std::string& role,
+    unsigned int in_streams,
+    unsigned int out_streams) : role_(role),
+                                in_streams_(in_streams),
+                                out_streams_(out_streams),
+                                dump_(configuration->property(role + ".dump", false)),
+                                dump_mat_(configuration->property(role + ".dump_mat", true))
 {
-    std::string default_dump_filename = "./observables.dat";
-    DLOG(INFO) << "role " << role;
-    dump_ = configuration->property(role + ".dump", false);
+    const std::string default_dump_filename("./observables.dat");
     dump_filename_ = configuration->property(role + ".dump_filename", default_dump_filename);
-    unsigned int default_depth = 0;
-    if (GPS_L1_CA_HISTORY_DEEP == GALILEO_E1_HISTORY_DEEP)
+
+    Obs_Conf conf{};
+    conf.dump = dump_;
+    conf.dump_mat = dump_mat_;
+    conf.dump_filename = dump_filename_;
+    conf.nchannels_in = in_streams_;
+    conf.nchannels_out = out_streams_;
+    conf.observable_interval_ms = configuration->property("GNSS-SDR.observable_interval_ms", conf.observable_interval_ms);
+    conf.enable_carrier_smoothing = configuration->property(role + ".enable_carrier_smoothing", conf.enable_carrier_smoothing);
+    conf.always_output_gs = configuration->property("PVT.an_output_enabled", conf.always_output_gs) || configuration->property(role + ".always_output_gs", conf.always_output_gs);
+    conf.enable_E6 = configuration->property("PVT.use_e6_for_pvt", conf.enable_E6);
+
+    if (FLAGS_carrier_smoothing_factor == DEFAULT_CARRIER_SMOOTHING_FACTOR)
         {
-            default_depth = GPS_L1_CA_HISTORY_DEEP;
+            conf.smoothing_factor = configuration->property(role + ".smoothing_factor", conf.smoothing_factor);
         }
-    else
+    DLOG(INFO) << "role " << role;
+    if (conf.enable_carrier_smoothing == true)
         {
-            default_depth = 100;
+            LOG(INFO) << "Observables carrier smoothing enabled with smoothing factor " << conf.smoothing_factor;
         }
-    unsigned int history_deep = configuration->property(role + ".averaging_depth", default_depth);
-    observables_ = hybrid_make_observables_cc(in_streams_, dump_, dump_filename_, history_deep);
-    DLOG(INFO) << "pseudorange(" << observables_->unique_id() << ")";
+    observables_ = hybrid_observables_gs_make(conf);
+    DLOG(INFO) << "Observables block ID (" << observables_->unique_id() << ")";
 }
-
-
-
-
-HybridObservables::~HybridObservables()
-{}
-
-
 
 
 void HybridObservables::connect(gr::top_block_sptr top_block)
 {
-    if(top_block) { /* top_block is not null */};
+    if (top_block)
+        { /* top_block is not null */
+        };
     // Nothing to connect internally
     DLOG(INFO) << "nothing to connect internally";
 }
 
 
-
 void HybridObservables::disconnect(gr::top_block_sptr top_block)
 {
-    if(top_block) { /* top_block is not null */};
+    if (top_block)
+        { /* top_block is not null */
+        };
     // Nothing to disconnect
 }
-
-
 
 
 gr::basic_block_sptr HybridObservables::get_left_block()
 {
     return observables_;
 }
-
-
 
 
 gr::basic_block_sptr HybridObservables::get_right_block()

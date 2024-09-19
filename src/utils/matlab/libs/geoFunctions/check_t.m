@@ -1,7 +1,7 @@
 function corrTime = check_t(time)
-%CHECK_T accounting for beginning or end of week crossover.
+% CHECK_T accounting for beginning or end of week crossover.
 %
-%corrTime = check_t(time);
+% corrTime = check_t(time);
 %
 %   Inputs:
 %       time        - time in seconds
@@ -9,11 +9,11 @@ function corrTime = check_t(time)
 %   Outputs:
 %       corrTime    - corrected time (seconds)
 
-%Kai Borre 04-01-96
-%Copyright (c) by Kai Borre
+% GNSS-SDR is a Global Navigation Satellite System software-defined receiver.
+% This file is part of GNSS-SDR.
 %
-% CVS record:
-% $Id: check_t.m,v 1.1.1.1.2.4 2006/08/22 13:45:59 dpl Exp $
+% SPDX-FileCopyrightText: Kai Borre
+% SPDX-License-Identifier: GPL-3.0-or-later
 %==========================================================================
 
 half_week = 302400;     % seconds
@@ -25,4 +25,5 @@ if time > half_week
 elseif time < -half_week
     corrTime = time + 2*half_week;
 end
+
 %%%%%%% end check_t.m  %%%%%%%%%%%%%%%%%
